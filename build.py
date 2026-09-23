@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import platform
+import re
 import shutil
 import subprocess
 import tarfile
@@ -151,11 +152,13 @@ def main():
     shutil.copytree(ROOT / 'licenses', stage / 'licenses', dirs_exist_ok=True)
     (stage / 'cmake').mkdir(exist_ok=True)
     shutil.copyfile(ROOT / 'cmake/EchHttpDeps.cmake', stage / 'cmake/EchHttpDeps.cmake')
+    compiler_info = next((curl_build / 'CMakeFiles').glob('*/CMakeCXXCompiler.cmake')).read_text()
+    compiler = dict(re.findall(r'set\(CMAKE_CXX_(COMPILER(?:_ID|_VERSION)?) "([^"]+)"\)', compiler_info))
     metadata = {'schema': 1, 'release': manifest['release'], 'target': target,
                 'curl': manifest['curl'], 'boringssl': manifest['boringssl'],
                 'build_commit': os.environ.get('GITHUB_SHA', 'local'),
                 'cmake': subprocess.check_output([cmake, '--version'], text=True, env=env).splitlines()[0],
-                'compiler': next(line for line in cache_text.splitlines() if line.startswith('CMAKE_CXX_COMPILER:')),
+                'compiler': compiler,
                 'android_ndk': '28.2.13676358' if target.startswith('android-') else None,
                 'linux_baseline': 'glibc 2.35, GCC 11/libstdc++' if target.startswith('linux-') else None,
                 'files': {p.relative_to(stage).as_posix(): digest(p) for p in sorted(stage.rglob('*'))
